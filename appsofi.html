@@ -1,0 +1,181 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Balón para Sofía</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100vw;
+      height: 100vh;
+      background-color: #f0f0f0;
+    }
+    canvas {
+      width: 100vw !important;
+      height: 100vh !important;
+      display: block;
+      border-radius: 0;
+      box-shadow: none;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    let balonX, balonY;
+    let speedX, speedY;
+    let showMessage = false;
+    let isMoving = true;
+    let time = 0;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      balonX = width / 2;
+      balonY = height / 2;
+      speedX = random(-5, 5); // Velocidad rápida
+      speedY = random(-5, 5); // Velocidad rápida
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+
+    function draw() {
+      // Fondo con gradiente animado
+      let c1 = color(135, 206, 250); // Azul claro
+      let c2 = color(255, 165, 0); // Naranja vibrante
+      for (let y = 0; y < height; y++) {
+        let inter = map(y, 0, height, 0, 1);
+        let c = lerpColor(c1, c2, inter + sin(time * 0.02) * 0.1);
+        stroke(c);
+        line(0, y, width, y);
+      }
+      time += 0.1;
+
+      // Actualizar posición del balón solo si está en movimiento
+      if (isMoving) {
+        balonX += speedX;
+        balonY += speedY;
+
+        // Rebotar en los bordes (ajustado al tamaño del balón)
+        if (balonX < 30 || balonX > width - 30) {
+          speedX *= -1;
+        }
+        if (balonY < 30 || balonY > height - 30) {
+          speedY *= -1;
+        }
+      }
+
+      // Dibujar balón de fútbol
+      // Cuerpo del balón
+      fill(255); // Blanco de fondo
+      ellipse(balonX, balonY, 60, 60);
+      // Patrones hexagonales (simulados con pentágonos negros)
+      fill(0); // Negro para patrones
+      for (let angle = 0; angle < TWO_PI; angle += PI / 3) {
+        let x = balonX + cos(angle) * 20;
+        let y = balonY + sin(angle) * 20;
+        beginShape();
+        for (let i = 0; i < 5; i++) {
+          let a = i * TWO_PI / 5 + time * 0.1; // Rotación suave
+          vertex(x + cos(a) * 8, y + sin(a) * 8);
+        }
+        endShape(CLOSE);
+      }
+      // Detalles (ojos y sonrisa)
+      fill(0); // Ojos negros
+      ellipse(balonX - 10, balonY - 10, 8, 8);
+      ellipse(balonX + 10, balonY - 10, 8, 8);
+      fill(255, 69, 0); // Sonrisa naranja
+      arc(balonX, balonY + 10, 20, 10, 0, PI); // Sonrisa
+
+      // Mostrar mensaje en toda la pantalla si está activado
+      if (showMessage) {
+        // Fondo semitransparente con brillo
+        fill(255, 165, 0, 200); // Naranja semitransparente
+        rectMode(CORNER);
+        rect(0, 0, width, height);
+        // Efecto de brillo (círculos suaves)
+        fill(255, 255, 255, 50);
+        ellipse(width / 2, height / 2, 200 + sin(time) * 20, 200 + sin(time) * 20);
+        // Texto grande con contorno, ajustado al tamaño de la pantalla
+        textAlign(CENTER, CENTER);
+        textSize(min(width, height) * 0.15); // Tamaño proporcional
+        textStyle(BOLD);
+        stroke(255, 255, 255); // Contorno blanco
+        strokeWeight(4);
+        fill(135, 206, 250); // Azul claro
+        text("Huevos Sofía", width / 2, height / 2);
+        strokeWeight(1); // Restaurar grosor
+      }
+    }
+
+    function mousePressed() {
+      if (showMessage) {
+        // Si el mensaje está visible, ocultarlo y reanudar movimiento
+        showMessage = false;
+        isMoving = true;
+      } else {
+        // Verificar si se hace clic en el balón (área aproximada)
+        if (mouseX > balonX - 30 && mouseX < balonX + 30 && mouseY > balonY - 30 && mouseY < balonY + 30) {
+          showMessage = true;
+          isMoving = false; // Detener el balón
+        }
+      }
+    }
+
+    function touchStarted() {
+      // Manejar toques en dispositivos móviles
+      mousePressed();
+      return false; // Prevenir comportamiento predeterminado
+    }
+  </script>
+</body>
+</html>
